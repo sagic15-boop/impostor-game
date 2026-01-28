@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Users, Eye, EyeOff, UserPlus, Play, RotateCcw, 
   HelpCircle, Check, Crown, Skull, Fingerprint, 
-  Sparkles, Timer, Trophy, Shuffle, Database, Settings, ArrowLeft, Maximize, X, ToggleLeft, ToggleRight
+  Sparkles, Timer, Trophy, Shuffle, Database, Settings, ArrowLeft, Maximize, CheckCircle, Save, FolderOpen, Trash2, Home
 } from 'lucide-react';
 
 // --- Helper Functions ---
@@ -59,6 +59,41 @@ const PlayerRow = ({ name, colorTheme, avatarSeed, onRemove }) => {
   );
 };
 
+const PlayerGridItem = ({ player, isRevealed, onClick }) => {
+  const themeColor = {
+    purple: "#d946ef", blue: "#00f2ff", green: "#22c55e", pink: "#ec4899"
+  }[player.colorTheme] || "#d946ef";
+
+  return (
+    <button 
+      onClick={onClick}
+      disabled={isRevealed}
+      className={`
+        relative flex flex-col items-center justify-center gap-2 p-4 rounded-2xl transition-all duration-300
+        ${isRevealed ? 'opacity-50 grayscale scale-95 cursor-default' : 'hover:scale-105 active:scale-95 bg-slate-800/40 border border-white/10 hover:border-white/30'}
+      `}
+    >
+      <div className={`relative w-20 h-20 rounded-full border-2 p-1 ${isRevealed ? 'border-[#22c55e]' : ''}`} style={{ borderColor: isRevealed ? '#22c55e' : themeColor }}>
+        <div className="w-full h-full rounded-full overflow-hidden bg-slate-900">
+           <img 
+             src={`https://api.dicebear.com/7.x/bottts/svg?seed=${player.avatarSeed}`} 
+             alt="avatar" 
+             className="w-full h-full object-cover"
+           />
+        </div>
+        {isRevealed && (
+          <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
+            <CheckCircle size={32} className="text-[#22c55e] drop-shadow-lg" />
+          </div>
+        )}
+      </div>
+      <span className={`font-bold text-sm tracking-wide ${isRevealed ? 'text-[#22c55e]' : 'text-white'}`}>
+        {player.name}
+      </span>
+    </button>
+  );
+};
+
 const HoloContainer = ({ children, title }) => (
   <div className="relative p-[2px] rounded-3xl bg-gradient-to-b from-purple-500 via-cyan-500 to-purple-500 shadow-[0_0_20px_rgba(139,92,246,0.3)]">
     <div className="bg-[#0f172a] rounded-[22px] h-full w-full p-4 relative overflow-hidden">
@@ -88,6 +123,8 @@ const StartButton = ({ onClick, disabled, children }) => (
   </button>
 );
 
+// --- Modals ---
+
 const SettingsModal = ({ isOpen, onClose, config, setConfig }) => {
   if (!isOpen) return null;
 
@@ -96,8 +133,6 @@ const SettingsModal = ({ isOpen, onClose, config, setConfig }) => {
       <div className="relative w-full max-w-sm">
         <HoloContainer title="Game Settings">
           <div className="space-y-6 py-4">
-            
-            {/* Toggle 1: Show Category */}
             <div className="flex items-center justify-between">
               <div>
                 <h4 className="text-white font-bold">Impostor Category</h4>
@@ -107,11 +142,10 @@ const SettingsModal = ({ isOpen, onClose, config, setConfig }) => {
                 onClick={() => setConfig(prev => ({ ...prev, showCategory: !prev.showCategory }))}
                 className={`transition-colors ${config.showCategory ? 'text-[#00f2ff]' : 'text-slate-600'}`}
               >
-                {config.showCategory ? <ToggleRight size={40} /> : <ToggleLeft size={40} />}
+                {config.showCategory ? <div className="w-12 h-6 bg-[#00f2ff]/20 rounded-full relative border border-[#00f2ff]"><div className="absolute right-1 top-1 w-4 h-4 bg-[#00f2ff] rounded-full shadow-[0_0_10px_#00f2ff]"></div></div> : <div className="w-12 h-6 bg-slate-700 rounded-full relative"><div className="absolute left-1 top-1 w-4 h-4 bg-slate-500 rounded-full"></div></div>}
               </button>
             </div>
 
-            {/* Toggle 2: Show Hint */}
             <div className="flex items-center justify-between">
               <div>
                 <h4 className="text-white font-bold">Impostor Hint</h4>
@@ -121,10 +155,9 @@ const SettingsModal = ({ isOpen, onClose, config, setConfig }) => {
                 onClick={() => setConfig(prev => ({ ...prev, showHint: !prev.showHint }))}
                 className={`transition-colors ${config.showHint ? 'text-[#00f2ff]' : 'text-slate-600'}`}
               >
-                {config.showHint ? <ToggleRight size={40} /> : <ToggleLeft size={40} />}
+                {config.showHint ? <div className="w-12 h-6 bg-[#00f2ff]/20 rounded-full relative border border-[#00f2ff]"><div className="absolute right-1 top-1 w-4 h-4 bg-[#00f2ff] rounded-full shadow-[0_0_10px_#00f2ff]"></div></div> : <div className="w-12 h-6 bg-slate-700 rounded-full relative"><div className="absolute left-1 top-1 w-4 h-4 bg-slate-500 rounded-full"></div></div>}
               </button>
             </div>
-
           </div>
           
           <button 
@@ -139,7 +172,89 @@ const SettingsModal = ({ isOpen, onClose, config, setConfig }) => {
   );
 };
 
-// --- DATA PACKS (With Hints) ---
+const TemplatesModal = ({ isOpen, onClose, currentPlayers, onLoadTemplate }) => {
+  const [templates, setTemplates] = useState(() => {
+    try {
+      const saved = localStorage.getItem('impostor_templates');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  const [newTemplateName, setNewTemplateName] = useState('');
+
+  const saveTemplate = () => {
+    if (!newTemplateName.trim() || currentPlayers.length === 0) return;
+    const newTemplate = { name: newTemplateName, players: currentPlayers };
+    const updated = [...templates, newTemplate];
+    setTemplates(updated);
+    localStorage.setItem('impostor_templates', JSON.stringify(updated));
+    setNewTemplateName('');
+  };
+
+  const deleteTemplate = (index) => {
+    const updated = templates.filter((_, i) => i !== index);
+    setTemplates(updated);
+    localStorage.setItem('impostor_templates', JSON.stringify(updated));
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="relative w-full max-w-sm">
+        <HoloContainer title="Saved Groups">
+          <div className="space-y-4 py-2">
+            
+            {/* Save Current */}
+            <div className="flex gap-2">
+              <input 
+                type="text" 
+                value={newTemplateName}
+                onChange={(e) => setNewTemplateName(e.target.value)}
+                placeholder="Group Name..."
+                className="flex-1 bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm"
+              />
+              <button 
+                onClick={saveTemplate}
+                disabled={currentPlayers.length === 0 || !newTemplateName.trim()}
+                className="bg-[#00f2ff] text-slate-900 px-3 rounded-lg font-bold disabled:opacity-50"
+              >
+                <Save size={18} />
+              </button>
+            </div>
+
+            <div className="border-t border-white/10 my-2"></div>
+
+            {/* List */}
+            <div className="max-h-48 overflow-y-auto custom-scrollbar space-y-2">
+              {templates.length === 0 && <p className="text-slate-500 text-center text-sm py-4">No saved groups yet.</p>}
+              {templates.map((t, idx) => (
+                <div key={idx} className="flex justify-between items-center bg-slate-800/50 p-3 rounded-lg border border-white/5">
+                  <div className="text-left">
+                    <p className="text-white font-bold text-sm">{t.name}</p>
+                    <p className="text-slate-400 text-xs">{t.players.length} Players</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => { onLoadTemplate(t.players); onClose(); }} className="p-2 bg-[#22c55e]/20 text-[#22c55e] rounded hover:bg-[#22c55e]/30"><FolderOpen size={16} /></button>
+                    <button onClick={() => deleteTemplate(idx)} className="p-2 bg-red-500/20 text-red-500 rounded hover:bg-red-500/30"><Trash2 size={16} /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+          </div>
+          <button 
+            onClick={onClose}
+            className="w-full mt-4 py-3 rounded-xl border border-white/20 hover:bg-white/10 text-white font-bold transition-colors"
+          >
+            CLOSE
+          </button>
+        </HoloContainer>
+      </div>
+    </div>
+  );
+};
+
+// --- DATA PACKS ---
 const DATA_PACKS = {
   'חיות 🦁': [
     { word: 'אריה', hint: 'מלך' }, { word: 'פיל', hint: 'חדק' }, { word: 'ג׳ירפה', hint: 'צוואר' }, { word: 'כלב', hint: 'נאמן' }, 
@@ -217,25 +332,32 @@ export default function App() {
   const [newPlayerName, setNewPlayerName] = useState('');
   const [impostorCount, setImpostorCount] = useState(1);
   const [gameData, setGameData] = useState(null);
-  const [revealIndex, setRevealIndex] = useState(0);
-  const [isCardVisible, setIsCardVisible] = useState(false);
   const [timeLeft, setTimeLeft] = useState(300);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   
-  // Game Settings State
+  // Modals State
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
+  
+  // New States for the Grid Reveal Logic
+  const [revealedPlayers, setRevealedPlayers] = useState([]); 
+  const [activeRevealPlayer, setActiveRevealPlayer] = useState(null); 
+
+  // Config State
   const [gameConfig, setGameConfig] = useState({
     showCategory: true,
     showHint: false
   });
   
+  // History tracking for random logic
   const [usedWords, setUsedWords] = useState({});
+  // Track last category to prevent >2 repeats
+  const [categoryHistory, setCategoryHistory] = useState({ last: null, streak: 0 });
 
   const totalWordsCount = useMemo(() => {
     return Object.values(DATA_PACKS).reduce((acc, curr) => acc + curr.length, 0);
   }, []);
 
-  // Update max allowed impostors when players change
   useEffect(() => {
     const maxAllowed = Math.max(1, Math.floor(players.length / 2));
     if (impostorCount > maxAllowed) {
@@ -281,36 +403,65 @@ export default function App() {
     setPlayers(players.filter(p => p.id !== id));
   };
 
-  const getUniqueWord = (category) => {
-    const allWords = DATA_PACKS[category];
-    const used = usedWords[category] || [];
+  const getUniqueWordAndCategory = () => {
+    const categories = Object.keys(DATA_PACKS);
+    let selectedCategory;
+    let validCategory = false;
     
-    // Check for used objects by word property
+    // Safety break to prevent infinite loops (though unlikely with >2 categories)
+    let attempts = 0;
+
+    // 1. Pick Category (Max 2 repeats constraint)
+    while (!validCategory && attempts < 50) {
+      selectedCategory = categories[Math.floor(Math.random() * categories.length)];
+      
+      // If it's the same as last time, check streak
+      if (selectedCategory === categoryHistory.last) {
+        if (categoryHistory.streak < 2) {
+          validCategory = true;
+        }
+        // If streak is 2 (meaning it appeared twice already), loop again to pick another
+      } else {
+        validCategory = true;
+      }
+      attempts++;
+    }
+    
+    // Update streak history
+    if (selectedCategory === categoryHistory.last) {
+      setCategoryHistory(prev => ({ last: selectedCategory, streak: prev.streak + 1 }));
+    } else {
+      setCategoryHistory({ last: selectedCategory, streak: 1 });
+    }
+
+    // 2. Pick Word (No repeats until reset)
+    const allWords = DATA_PACKS[selectedCategory];
+    const used = usedWords[selectedCategory] || [];
+    
     let availableWords = allWords.filter(item => !used.some(usedItem => usedItem.word === item.word));
     
     if (availableWords.length === 0) {
       availableWords = allWords;
-      setUsedWords(prev => ({ ...prev, [category]: [] }));
+      setUsedWords(prev => ({ ...prev, [selectedCategory]: [] }));
     }
 
     const selectedItem = availableWords[Math.floor(Math.random() * availableWords.length)];
     
     setUsedWords(prev => {
-      const currentUsed = prev[category] || [];
+      const currentUsed = prev[selectedCategory] || [];
       const newList = availableWords.length === allWords.length 
         ? [selectedItem] 
         : [...currentUsed, selectedItem];
-      return { ...prev, [category]: newList };
+      return { ...prev, [selectedCategory]: newList };
     });
 
-    return selectedItem; // Returns object {word, hint}
+    return { category: selectedCategory, item: selectedItem };
   };
 
   const startGame = () => {
     if (players.length < 3) return;
-    const categories = Object.keys(DATA_PACKS);
-    const selectedCategory = categories[Math.floor(Math.random() * categories.length)];
-    const selectedWordObj = getUniqueWord(selectedCategory);
+    
+    const { category, item } = getUniqueWordAndCategory();
 
     let shuffledPlayers = shuffleArray([...players]);
     let roles = shuffledPlayers.map(p => ({ ...p, role: 'citizen' }));
@@ -326,27 +477,46 @@ export default function App() {
 
     setGameData({
       players: roles,
-      category: selectedCategory,
-      word: selectedWordObj.word,
-      hint: selectedWordObj.hint,
+      category: category,
+      word: item.word,
+      hint: item.hint,
       starter: starter
     });
 
-    setRevealIndex(0);
-    setIsCardVisible(false);
+    // Reset Reveal State
+    setRevealedPlayers([]);
+    setActiveRevealPlayer(null);
     setTimeLeft(300);
     setIsTimerRunning(false);
     setGameState('reveal');
   };
 
-  const nextReveal = () => {
-    setIsCardVisible(false);
-    if (revealIndex + 1 < gameData.players.length) {
-      setRevealIndex(revealIndex + 1);
-    } else {
-      setGameState('playing');
-      setIsTimerRunning(true);
+  const handlePlayerRevealClick = (player) => {
+    if (!revealedPlayers.includes(player.id)) {
+      setActiveRevealPlayer(player);
     }
+  };
+
+  const handleHideIntel = () => {
+    if (activeRevealPlayer) {
+      setRevealedPlayers(prev => [...prev, activeRevealPlayer.id]);
+      setActiveRevealPlayer(null);
+    }
+  };
+
+  const startRound = () => {
+    setGameState('playing');
+    setIsTimerRunning(true);
+  };
+
+  const loadTemplate = (templatePlayers) => {
+    // We need to regenerate IDs and seeds to ensure they are fresh but keep names
+    const refreshedPlayers = templatePlayers.map(p => ({
+      ...p,
+      id: Date.now() + Math.random(),
+      avatarSeed: p.avatarSeed || (Date.now() + Math.random().toString())
+    }));
+    setPlayers(refreshedPlayers);
   };
 
   useEffect(() => {
@@ -373,12 +543,18 @@ export default function App() {
       <div className="min-h-screen bg-[#0a0e17] text-slate-100 font-sans selection:bg-[#00f2ff] selection:text-[#0f172a]" dir="ltr">
         <LaserBackground />
         
-        {/* Settings Modal */}
         <SettingsModal 
           isOpen={isSettingsOpen} 
           onClose={() => setIsSettingsOpen(false)} 
           config={gameConfig}
           setConfig={setGameConfig}
+        />
+
+        <TemplatesModal
+          isOpen={isTemplatesOpen}
+          onClose={() => setIsTemplatesOpen(false)}
+          currentPlayers={players}
+          onLoadTemplate={loadTemplate}
         />
 
         <div className="relative max-w-md mx-auto p-4 min-h-screen flex flex-col z-10">
@@ -389,6 +565,13 @@ export default function App() {
               Game Setup
             </h1>
             <div className="flex gap-2">
+              <button 
+                onClick={() => setIsTemplatesOpen(true)}
+                className="text-cyan-400 p-1 hover:bg-white/5 rounded-full"
+                title="Save/Load Groups"
+              >
+                <FolderOpen size={24} />
+              </button>
               <button onClick={toggleFullScreen} className="text-cyan-400 p-1 hover:bg-white/5 rounded-full"><Maximize size={24} /></button>
               <button onClick={() => setIsSettingsOpen(true)} className="text-cyan-400 p-1 hover:bg-white/5 rounded-full"><Settings size={24} /></button>
             </div>
@@ -464,51 +647,23 @@ export default function App() {
           </HoloContainer>
 
           <div className="mt-4 text-center">
-             <p className="text-slate-600 text-xs">V 1.0.7 | The Impostor</p>
+             <p className="text-slate-600 text-xs">V 1.0.9 | The Impostor</p>
           </div>
         </div>
       </div>
     );
   }
 
-  // 2. REVEAL
+  // 2. REVEAL (GRID LAYOUT)
   if (gameState === 'reveal') {
-    const currentPlayer = gameData.players[revealIndex];
-    const isImpostor = currentPlayer.role === 'impostor';
-
-    return (
-      <div className="min-h-screen bg-[#0a0e17] text-slate-100 flex flex-col font-sans relative" dir="ltr">
-        <LaserBackground />
-        
-        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center max-w-md mx-auto w-full relative z-10">
-          {!isCardVisible ? (
-             <HoloContainer>
-                <div className="py-8 space-y-8">
-                  <div className="relative w-32 h-32 mx-auto">
-                      <div className="absolute inset-0 bg-[#00f2ff] rounded-full blur-2xl opacity-20 animate-pulse"></div>
-                      <div className="relative bg-slate-800 rounded-full w-full h-full flex items-center justify-center ring-1 ring-[#00f2ff]/30 shadow-[0_0_30px_rgba(0,242,255,0.2)] overflow-hidden">
-                        <img 
-                          src={`https://api.dicebear.com/7.x/bottts/svg?seed=${currentPlayer.avatarSeed}`} 
-                          alt="avatar" 
-                          className="w-24 h-24 object-cover"
-                        />
-                      </div>
-                  </div>
-                  
-                  <div>
-                      <div className="text-[#00f2ff] text-sm tracking-[0.2em] uppercase mb-2 font-bold animate-pulse">Security Level: TOP SECRET</div>
-                      <h2 className="text-2xl text-slate-300 font-medium">Pass device to</h2>
-                      <h1 className="text-5xl font-bold mt-2 text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]">
-                        {currentPlayer.name}
-                      </h1>
-                  </div>
-                  
-                  <StartButton onClick={() => setIsCardVisible(true)}>
-                    REVEAL IDENTITY
-                  </StartButton>
-                </div>
-             </HoloContainer>
-          ) : (
+    
+    // If a player is selected, show the "Secret Identity" Modal/Card
+    if (activeRevealPlayer) {
+      const isImpostor = activeRevealPlayer.role === 'impostor';
+      return (
+        <div className="min-h-screen bg-[#0a0e17] text-slate-100 flex flex-col font-sans relative" dir="ltr">
+          <LaserBackground />
+          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center max-w-md mx-auto w-full relative z-10">
             <HoloContainer>
                <div className="py-6 space-y-6">
                  <div className="flex justify-center">
@@ -520,34 +675,29 @@ export default function App() {
                     <h2 className={`text-4xl font-bold ${isImpostor ? 'text-red-500' : 'text-[#22c55e]'}`}>
                       {isImpostor ? 'IMPOSTOR' : 'LOYAL AGENT'}
                     </h2>
+                    <p className="text-lg text-white font-medium mt-1">{activeRevealPlayer.name}</p>
                  </div>
 
                  <div className="py-6 px-4 bg-slate-900/80 rounded-xl border border-white/10 space-y-4">
                     {isImpostor ? (
                       <>
                         <p className="text-red-200 font-medium">Mission: Blend in & identify the secret word.</p>
-                        
-                        {/* Impostor Hints Logic */}
                         {(gameConfig.showCategory || gameConfig.showHint) && (
                           <div className="pt-4 border-t border-white/10 space-y-3">
-                            
                             {gameConfig.showCategory && (
                               <div>
                                 <span className="text-xs text-slate-500 block mb-1 uppercase tracking-wider">Category Hint</span>
                                 <span className="text-xl font-bold text-white">{gameData.category}</span>
                               </div>
                             )}
-
                             {gameConfig.showHint && (
                               <div>
                                 <span className="text-xs text-purple-400 block mb-1 uppercase tracking-wider font-bold">Secret Hint</span>
                                 <span className="text-lg font-bold text-purple-200">{gameData.hint}</span>
                               </div>
                             )}
-
                           </div>
                         )}
-                        
                         {!gameConfig.showCategory && !gameConfig.showHint && (
                           <p className="text-xs text-slate-500 mt-2 italic">No intel available.</p>
                         )}
@@ -567,12 +717,55 @@ export default function App() {
                     )}
                  </div>
 
-                 <button onClick={nextReveal} className="w-full py-4 rounded-xl border border-white/20 hover:bg-white/10 text-white font-bold transition-colors">
+                 <button onClick={handleHideIntel} className="w-full py-4 rounded-xl border border-white/20 hover:bg-white/10 text-white font-bold transition-colors">
                     HIDE INTEL
                  </button>
                </div>
             </HoloContainer>
-          )}
+          </div>
+        </div>
+      );
+    }
+
+    // Grid View
+    const allRevealed = gameData.players.length > 0 && revealedPlayers.length === gameData.players.length;
+
+    return (
+      <div className="min-h-screen bg-[#0a0e17] text-slate-100 flex flex-col font-sans relative" dir="ltr">
+        <LaserBackground />
+        
+        <div className="relative max-w-md mx-auto p-4 min-h-screen flex flex-col z-10">
+          
+          <div className="flex justify-between items-center mb-6 mt-4">
+             <button onClick={() => setGameState('setup')} className="text-slate-500 hover:text-white transition-colors">
+               <Home size={24} />
+             </button>
+             <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-cyan-400 uppercase tracking-widest drop-shadow-md">
+               Identity Check
+             </h2>
+             <div className="w-6"></div> {/* Spacer for centering */}
+          </div>
+          
+          <p className="text-slate-400 text-sm text-center mb-4">Pass the phone. Tap your avatar to check your role.</p>
+
+          <div className="flex-1 overflow-y-auto custom-scrollbar">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              {gameData.players.map(p => (
+                <PlayerGridItem 
+                  key={p.id}
+                  player={p}
+                  isRevealed={revealedPlayers.includes(p.id)}
+                  onClick={() => handlePlayerRevealClick(p)}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-4">
+             <StartButton onClick={startRound} disabled={!allRevealed}>
+                {allRevealed ? "START ROUND" : `WAITING (${revealedPlayers.length}/${gameData.players.length})`}
+             </StartButton>
+          </div>
         </div>
       </div>
     );
